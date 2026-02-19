@@ -222,8 +222,13 @@ async function fetchAndTest() {
   
   console.log(`有效代理 ${valid.length} 个`);
   
-  // 4. 地区分组+排名
-  const ranked = rankProxies(valid);
+  // 4. 综合评分+排名
+  const scored = valid.map(p => ({
+    ...p,
+    score: Math.round((10000 / (p.latency + 100)) * (p.downloadSpeed + 1)),
+  }));
+  scored.sort((a, b) => b.score - a.score);
+  const ranked = rankProxies(scored);
   
   // 统计信息
   const stats = {
@@ -377,7 +382,7 @@ function rankProxies(proxies) {
   // 排序+命名
   const result = [];
   for (const [country, list] of Object.entries(grouped)) {
-    const sorted = list.sort((a, b) => a.latency - b.latency);
+    const sorted = list.sort((a, b) => (b.score || 0) - (a.score || 0));
     const top = sorted.slice(0, CONFIG.MAX_PER_COUNTRY);
     
     top.forEach((p, i) => {

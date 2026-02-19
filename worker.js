@@ -17,6 +17,7 @@ const CONFIG = {
   
   // ========== 测速配置 ==========
   TEST_URL: 'https://httpbin.org/get',
+  SPEED_TEST_URL: 'https://speed.cloudflare.com/__down?bytes=1000000',  // 1MB测速
   TIMEOUT: 5000,           // 超时ms
   MAX_PER_COUNTRY: 10,     // 每国家保留数
   MAX_CONCURRENT: 20,      // 并发数
@@ -216,7 +217,7 @@ async function fetchAndTest() {
   
   // 3. 测速
   const tested = await testProxies(rawProxies);
-  const valid = tested.filter(p => p.delay > 0);
+  const valid = tested.filter(p => p.latency > 0);
   const failed = tested.filter(p => p.delay <= 0);
   
   console.log(`有效代理 ${valid.length} 个`);
@@ -247,9 +248,10 @@ async function fetchAndTest() {
   const details = tested.map(p => ({
     server: p.server,
     port: p.port,
-    delay: p.delay,
+    latency: p.latency,
+    downloadSpeed: p.downloadSpeed,
     country: p.country,
-    status: p.delay > 0 ? 'ok' : 'failed',
+    status: p.latency > 0 ? 'ok' : 'failed',
   }));
   
   return { valid: ranked, stats, details };
@@ -310,18 +312,37 @@ async function testProxy(proxy) {
   const start = Date.now();
   
   try {
+    // 延迟测试
     await fetch(CONFIG.TEST_URL, {
       proxy: `http://${proxy.server}:${proxy.port}`,
       signal: AbortSignal.timeout(CONFIG.TIMEOUT),
     });
+    const latency = Date.now() - start;
+    
+    // 下载测速
+    let downloadSpeed = 0;
+    try {
+      const speedStart = Date.now();
+      const resp = await fetch(CONFIG.SPEED_TEST_URL, {
+        proxy: `http://${proxy.server}:${proxy.port}`,
+        signal: AbortSignal.timeout(CONFIG.TIMEOUT),
+      });
+      await resp.arrayBuffer();
+      const speedTime = Date.now() - speedStart;
+      // 速度 = 1MB / 时间(秒)，单位 MB/s
+      downloadSpeed = Math.round(1000 / speedTime * 10) / 10;
+    } catch (e) {
+      // 下载测速失败不影响
+    }
     
     return {
       ...proxy,
-      delay: Date.now() - start,
+      latency,
+      downloadSpeed,
       country: guessCountry(proxy.server),
     };
   } catch (e) {
-    return { ...proxy, delay: -1, country: 'XX' };
+    return { ...proxy, latency: -1, downloadSpeed: 0, country: 'XX' };
   }
 }
 
@@ -356,7 +377,7 @@ function rankProxies(proxies) {
   // 排序+命名
   const result = [];
   for (const [country, list] of Object.entries(grouped)) {
-    const sorted = list.sort((a, b) => a.delay - b.delay);
+    const sorted = list.sort((a, b) => a.latency - b.latency);
     const top = sorted.slice(0, CONFIG.MAX_PER_COUNTRY);
     
     top.forEach((p, i) => {
@@ -384,7 +405,8 @@ function generateClash(proxies) {
     yaml += `    type: http\n`;
     yaml += `    server: ${p.server}\n`;
     yaml += `    port: ${p.port}\n`;
-    if (p.delay > 0) yaml += `    delay: ${p.delay}\n`;
+    if (p.latency > 0) yaml += `    latency: ${p.latency}\n`;
+    if (p.downloadSpeed > 0) yaml += `    speed: ${p.downloadSpeed}MB/s\n`;
     yaml += '\n';
   }
   

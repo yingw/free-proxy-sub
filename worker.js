@@ -499,13 +499,21 @@ function clashResponse(proxies) {
 const KV = {
   async get(key) {
     try {
-      return await PROXY_KV.get(key);
+      const kv = globalThis.PROXY_KV || (await import('cloudflare:workers')).getKV('PROXY_KV');
+      return await kv?.get(key);
     } catch {
       return null;
     }
   },
   async put(key, value, options) {
-    return PROXY_KV.put(key, value, options);
+    try {
+      const kv = globalThis.PROXY_KV;
+      if (kv) {
+        return await kv.put(key, value, options);
+      }
+    } catch (e) {
+      console.error('KV put error:', e);
+    }
   },
 };
 

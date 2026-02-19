@@ -496,11 +496,14 @@ function clashResponse(proxies) {
 }
 
 // ========== KV 辅助 ==========
+// 注意：PROXY_KV 需要在 Cloudflare Dashboard 的 Worker 设置中绑定
+// 路径：Workers → 你的Worker → 设置 → 变量 → KV 命名空间绑定
 const KV = {
   async get(key) {
     try {
-      const kv = globalThis.PROXY_KV || (await import('cloudflare:workers')).getKV('PROXY_KV');
-      return await kv?.get(key);
+      // 优先使用 env 传入的绑定，其次尝试 globalThis
+      const kv = globalThis.PROXY_KV;
+      return kv ? await kv.get(key) : null;
     } catch {
       return null;
     }

@@ -215,8 +215,12 @@ async function fetchAndTest() {
   rawProxies = rawProxies.filter(isSafeProxy);
   console.log(`安全过滤后 ${rawProxies.length} 个`);
   
-  // 3. 测速
-  const tested = await testProxies(rawProxies);
+  // 3. 批量查询地区
+  const ips = rawProxies.map(p => p.server);
+  const countries = await fetchCountriesBatch(ips);
+  
+  // 4. 测速
+  const tested = await testProxies(rawProxies, countries);
   const valid = tested.filter(p => p.latency > 0);
   const failed = tested.filter(p => p.delay <= 0);
   
@@ -295,12 +299,12 @@ function isSafeProxy(proxy) {
 /**
  * 并发测速
  */
-async function testProxies(proxies) {
+async function testProxies(proxies, countries = {}) {
   const results = [];
   
   for (let i = 0; i < proxies.length; i += CONFIG.MAX_CONCURRENT) {
     const batch = proxies.slice(i, i + CONFIG.MAX_CONCURRENT);
-    const tested = await Promise.all(batch.map(testProxy));
+    const tested = await Promise.all(batch.map(p => testProxy(p, countries[p.server])));
     results.push(...tested);
     
     console.log(`测速进度: ${Math.min(i + CONFIG.MAX_CONCURRENT, proxies.length)}/${proxies.length}`);
@@ -313,7 +317,7 @@ async function testProxies(proxies) {
 /**
  * 测试单个代理
  */
-async function testProxy(proxy) {
+async function testProxy(proxy, country = 'XX') {
   const start = Date.now();
   
   try {
@@ -344,27 +348,65 @@ async function testProxy(proxy) {
       ...proxy,
       latency,
       downloadSpeed,
-      country: guessCountry(proxy.server),
+      country,
     };
   } catch (e) {
-    return { ...proxy, latency: -1, downloadSpeed: 0, country: 'XX' };
+    return { ...proxy, latency: -1, downloadSpeed: 0, country };
   }
 }
 
 /**
- * 简单地区猜测（实际应用建议用IP库）
+ * IP 地理库缓存
  */
-function guessCountry(ip) {
-  // 常见IP段（极简实现）
-  if (ip.startsWith('3.')) return 'US';
-  if (ip.startsWith('35.')) return 'US';
-  if (ip.startsWith('52.')) return 'US';
-  if (ip.startsWith('104.')) return 'US';
-  if (ip.startsWith('133.') || ip.startsWith('150.')) return 'JP';
-  if (ip.startsWith('202.')) return 'AP';
-  if (ip.startsWith('218.') || ip.startsWith('119.')) return 'CN';
+const geoCache = {};
+
+/**
+ * 查询 IP 地区（使用 ip-api.com）
+ */
+async function fetchCountry(ip) {
+  if (geoCache[ip]) return geoCache[ip];
   
-  return 'XX';
+  try {
+    const resp = await fetch(`http://ip-api.com/json/${ip}?fields=countryCode`);
+    const data = await resp.json();
+    geoCache[ip] = data.countryCode || 'XX';
+    return geoCache[ip];
+  } catch (e) {
+    return 'XX';
+  }
+}
+
+/**
+ * 批量查询 IP 地区（更高效）
+ */
+async function fetchCountriesBatch(ips) {
+  if (ips.length === 0) return {};
+  
+  // 过滤已缓存
+  const uncached = ips.filter(ip => !geoCache[ip]);
+  if (uncached.length > 0) {
+    try {
+      // 批量查询最多 100 个
+      const batch = uncached.slice(0, 100);
+      const resp = await fetch('http://ip-api.com/batch?fields=query,countryCode', {
+        method: 'POST',
+        body: JSON.stringify(batch.map(ip => ({ query: ip }))),
+      });
+      const results = await resp.json();
+      for (const r of results) {
+        geoCache[r.query] = r.countryCode || 'XX';
+      }
+    } catch (e) {
+      // 批量失败不影响
+    }
+  }
+  
+  // 返回结果
+  const result = {};
+  for (const ip of ips) {
+    result[ip] = geoCache[ip] || 'XX';
+  }
+  return result;
 }
 
 /**

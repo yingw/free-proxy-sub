@@ -71,28 +71,49 @@ export default {
     // 手动触发更新
     const update = url.searchParams.get('update');
     if (update === '1') {
-      const proxies = await fetchAndTest();
-      await KV.put('proxies', JSON.stringify(proxies), { 
+      const result = await fetchAndTest();
+      await KV.put('proxies', JSON.stringify(result.valid), { 
+        expirationTtl: CONFIG.CACHE_TTL 
+      });
+      await KV.put('test_stats', JSON.stringify(result.stats), { 
         expirationTtl: CONFIG.CACHE_TTL 
       });
       return jsonResponse({ 
         success: true, 
-        count: proxies.length,
-        timestamp: new Date().toISOString() 
+        totalFound: result.stats.totalFound,
+        tested: result.stats.totalTested,
+        valid: result.stats.validCount,
+        failed: result.stats.failedCount,
+        successRate: result.stats.successRate,
+        duration: result.stats.duration + 'ms',
+        timestamp: result.stats.endTime,
       });
     }
     
     // 查看状态
     if (url.pathname === '/status') {
       const proxies = await getProxies();
+      const stats = await getTestStats();
       const countries = {};
       for (const p of proxies) {
         countries[p.country] = (countries[p.country] || 0) + 1;
       }
       return jsonResponse({
-        total: proxies.length,
+        // 当前代理
+        totalProxies: proxies.length,
         countries,
-        lastUpdate: new Date().toISOString(),
+        // 测试统计
+        testStats: stats ? {
+          lastTest: stats.endTime,
+          duration: stats.duration + 'ms',
+          sources: stats.sources,
+          totalFound: stats.totalFound,
+          totalTested: stats.totalTested,
+          validCount: stats.validCount,
+          failedCount: stats.failedCount,
+          successRate: stats.successRate,
+          countries: stats.countries,
+        } : null,
         cache: CONFIG.CACHE_TTL + '秒',
       });
     }
@@ -127,18 +148,30 @@ async function getProxies() {
   }
   
   // 重新抓取+测速
-  const proxies = await fetchAndTest();
-  await KV.put('proxies', JSON.stringify(proxies), { 
+  const result = await fetchAndTest();
+  await KV.put('proxies', JSON.stringify(result.valid), { 
+    expirationTtl: CONFIG.CACHE_TTL 
+  });
+  await KV.put('test_stats', JSON.stringify(result.stats), { 
     expirationTtl: CONFIG.CACHE_TTL 
   });
   
-  return proxies;
+  return result.valid;
+}
+
+/**
+ * 获取测试统计
+ */
+async function getTestStats() {
+  const cached = await KV.get('test_stats');
+  return cached ? JSON.parse(cached) : null;
 }
 
 /**
  * 抓取并测速
  */
 async function fetchAndTest() {
+  const startTime = Date.now();
   console.log('开始抓取代理...');
   
   // 1. 抓取
@@ -147,6 +180,7 @@ async function fetchAndTest() {
     try {
       const list = await fetchProxyList(source);
       rawProxies = [...rawProxies, ...list];
+      console.log(`抓取成功: ${source}, ${list.length} 个`);
     } catch (e) {
       console.error(`抓取失败: ${source}`, e.message);
     }
@@ -168,10 +202,33 @@ async function fetchAndTest() {
   // 3. 测速
   const tested = await testProxies(rawProxies);
   const valid = tested.filter(p => p.delay > 0);
+  const failed = tested.filter(p => p.delay <= 0);
+  
   console.log(`有效代理 ${valid.length} 个`);
   
   // 4. 地区分组+排名
-  return rankProxies(valid);
+  const ranked = rankProxies(valid);
+  
+  // 统计信息
+  const stats = {
+    startTime: new Date(startTime).toISOString(),
+    endTime: new Date().toISOString(),
+    duration: Date.now() - startTime,
+    sources: CONFIG.SOURCES.length,
+    totalFound: rawProxies.length,
+    totalTested: tested.length,
+    validCount: valid.length,
+    failedCount: failed.length,
+    successRate: tested.length > 0 ? (valid.length / tested.length * 100).toFixed(1) + '%' : '0%',
+    countries: {},
+  };
+  
+  // 国家统计
+  for (const p of valid) {
+    stats.countries[p.country] = (stats.countries[p.country] || 0) + 1;
+  }
+  
+  return { valid: ranked, stats };
 }
 
 /**

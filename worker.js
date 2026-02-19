@@ -68,6 +68,20 @@ export default {
       return new Response('Unauthorized', { status: 401 });
     }
     
+    // 手动触发更新
+    const update = url.searchParams.get('update');
+    if (update === '1') {
+      const proxies = await fetchAndTest();
+      await KV.put('proxies', JSON.stringify(proxies), { 
+        expirationTtl: CONFIG.CACHE_TTL 
+      });
+      return jsonResponse({ 
+        success: true, 
+        count: proxies.length,
+        timestamp: new Date().toISOString() 
+      });
+    }
+    
     // 获取代理
     let proxies = await getProxies();
     

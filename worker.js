@@ -94,6 +94,7 @@ export default {
     if (url.pathname === '/status') {
       const proxies = await getProxies();
       const stats = await getTestStats();
+      const details = await getTestDetails();
       const countries = {};
       for (const p of proxies) {
         countries[p.country] = (countries[p.country] || 0) + 1;
@@ -114,6 +115,8 @@ export default {
           successRate: stats.successRate,
           countries: stats.countries,
         } : null,
+        // 完整测试详情
+        testDetails: details,
         cache: CONFIG.CACHE_TTL + '秒',
       });
     }
@@ -155,6 +158,10 @@ async function getProxies() {
   await KV.put('test_stats', JSON.stringify(result.stats), { 
     expirationTtl: CONFIG.CACHE_TTL 
   });
+  // 存储完整测试结果
+  await KV.put('test_details', JSON.stringify(result.details), { 
+    expirationTtl: CONFIG.CACHE_TTL 
+  });
   
   return result.valid;
 }
@@ -164,6 +171,14 @@ async function getProxies() {
  */
 async function getTestStats() {
   const cached = await KV.get('test_stats');
+  return cached ? JSON.parse(cached) : null;
+}
+
+/**
+ * 获取测试详情
+ */
+async function getTestDetails() {
+  const cached = await KV.get('test_details');
   return cached ? JSON.parse(cached) : null;
 }
 
@@ -228,7 +243,16 @@ async function fetchAndTest() {
     stats.countries[p.country] = (stats.countries[p.country] || 0) + 1;
   }
   
-  return { valid: ranked, stats };
+  // 完整测试详情（包含成功和失败的）
+  const details = tested.map(p => ({
+    server: p.server,
+    port: p.port,
+    delay: p.delay,
+    country: p.country,
+    status: p.delay > 0 ? 'ok' : 'failed',
+  }));
+  
+  return { valid: ranked, stats, details };
 }
 
 /**

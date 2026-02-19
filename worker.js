@@ -82,6 +82,21 @@ export default {
       });
     }
     
+    // 查看状态
+    if (url.pathname === '/status') {
+      const proxies = await getProxies();
+      const countries = {};
+      for (const p of proxies) {
+        countries[p.country] = (countries[p.country] || 0) + 1;
+      }
+      return jsonResponse({
+        total: proxies.length,
+        countries,
+        lastUpdate: new Date().toISOString(),
+        cache: CONFIG.CACHE_TTL + '秒',
+      });
+    }
+    
     // 获取代理
     let proxies = await getProxies();
     

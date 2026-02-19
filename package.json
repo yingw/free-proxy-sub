@@ -1,0 +1,12 @@
+{
+  "name": "free-proxy-sub",
+  "version": "1.0.0",
+  "description": "免费代理订阅服务",
+  "main": "worker.js",
+  "scripts": {
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}

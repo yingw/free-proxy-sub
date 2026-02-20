@@ -11,12 +11,11 @@
 
 const CONFIG = {
   // ========== 数据源 ==========
-  // proxifly: https://github.com/proxifly/free-proxy-list (3862 stars, 每5分钟更新)
-  // jetkai: https://github.com/jetkai/proxy-list (642 stars)
-  // roosterkid: https://github.com/roosterkid/openproxylist (761 stars, 有V2Ray)
-  // TheSpeedX: https://github.com/TheSpeedX/PROXY-List (备用)
+  // TheSpeedX/PROXY-List: 5250 stars, 每天更新3次, 最活跃
+  // proxifly: 3862 stars, 每5分钟更新 (备用)
+  // roosterkid: 761 stars, 有V2Ray (备用)
   SOURCES: [
-    'https://raw.githubusercontent.com/jetkai/proxy-list/main/online-proxies/txt/proxies-http.txt',
+    'https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt',
   ],
   
   // ========== 测速配置 ==========

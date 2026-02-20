@@ -11,11 +11,10 @@
 
 const CONFIG = {
   // ========== 数据源 ==========
-  // TheSpeedX/PROXY-List: 5250 stars, 每天更新3次, 最活跃
-  // proxifly: 3862 stars, 每5分钟更新 (备用)
-  // roosterkid: 761 stars, 有V2Ray (备用)
+  // proxifly: 3862 stars, 每5分钟更新, 包含亚洲代理
+  // TheSpeedX: 5250 stars (备用)
   SOURCES: [
-    'https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt',
+    'https://raw.githubusercontent.com/proxifly/free-proxy-list/main/proxies/protocols/http/data.txt',
   ],
   
   // ========== 测速配置 ==========

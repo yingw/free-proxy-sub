@@ -11,13 +11,15 @@
 
 const CONFIG = {
   // ========== 数据源 ==========
-  // free-proxy-list.net: 页面抓取，每30分钟更新，支持Google筛选
+  // free-proxy-list.net: 页面抓取，每30分钟更新，支持Google筛选 (FP源)
+  // 66代理: 国内高匿名代理 (66源)
   // proxifly: 3862 stars (备用)
   SOURCES: [
     'https://free-proxy-list.net/',
     'https://free-proxy-list.net/zh-cn/',
     'https://free-proxy-list.net/ssl-proxy.html',
     'https://free-proxy-list.net/zh-cn/ssl-proxy.html',
+    { url: 'http://api.66daili.com/?anonymity=%E9%AB%98%E5%8C%BF&protocol=HTTPS&format=json', type: 'json66' },
   ],
   
   // ========== 测速配置 ==========
@@ -328,12 +330,37 @@ async function fetchAndTest() {
 /**
  * 从URL抓取代理列表
  */
-async function fetchProxyList(url) {
-  const response = await fetch(url, { timeout: 10000 });
-  const text = await response.text();
+async function fetchProxyList(source) {
+  // 支持两种格式：
+  // 1. 字符串 URL (HTML页面)
+  // 2. 对象 { url, type } (JSON API)
+  const url = typeof source === 'string' ? source : source.url;
+  const sourceType = typeof source === 'string' ? 'html' : source.type;
   
-  // 从HTML页面提取完整信息（支持Google筛选）
-  // 格式: IP, Port, Code, Country, Anonymity, Google, Https
+  const response = await fetch(url, { timeout: 10000 });
+  
+  // JSON API 格式（如66代理）
+  if (sourceType === 'json66') {
+    try {
+      const json = await response.json();
+      if (json.code === 0 && json.data) {
+        const proxies = json.data.map(item => ({
+          server: item.ip,
+          port: parseInt(item.port),
+          type: 'http',
+          source: '66'  // 标记来源
+        }));
+        console.log(`[66代理] 抓取 ${proxies.length} 个代理`);
+        return proxies;
+      }
+    } catch (e) {
+      console.error(`[66代理] 解析失败:`, e.message);
+    }
+    return [];
+  }
+  
+  // HTML 页面格式 (free-proxy-list.net)
+  const text = await response.text();
   const trRegex = /<tr><td>([\d.]+)<\/td><td>(\d+)<\/td><td>([A-Z]{2})<\/td><td class='hm'>[^<]*<\/td><td>([^<]+)<\/td><td class='hm'>([^<]*)<\/td><td class='hx'>([^<]*)<\/td>/g;
   const proxies = [];
   let match;
@@ -346,7 +373,8 @@ async function fetchProxyList(url) {
       proxies.push({
         server: ip,
         port: parseInt(port),
-        type: 'http'
+        type: 'http',
+        source: 'FP'  // 标记来源
       });
     }
   }
@@ -359,11 +387,11 @@ async function fetchProxyList(url) {
       .map(line => {
         let clean = line.replace(/^https?:\/\//, '');
         const [server, port] = clean.split(':');
-        return { server, port: parseInt(port), type: 'http' };
+        return { server, port: parseInt(port), type: 'http', source: 'FP' };
       });
   }
   
-  console.log(`[${url}] 抓取 ${proxies.length} 个支持Google的代理`);
+  console.log(`[FP] 抓取 ${proxies.length} 个支持Google的代理`);
   return proxies;
 }
 
@@ -514,9 +542,10 @@ function rankProxies(proxies) {
     
     top.forEach((p, i) => {
       const cnName = getCountryName(country);
+      const prefix = p.source === '66' ? '66' : 'FP';  // 根据来源区分
       result.push({
         ...p,
-        name: `${cnName}-${String(i + 1).padStart(2, '0')}`,
+        name: `${prefix}-${cnName}-${String(i + 1).padStart(2, '0')}`,
       });
     });
   }

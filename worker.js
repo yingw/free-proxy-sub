@@ -11,8 +11,12 @@
 
 const CONFIG = {
   // ========== 数据源 ==========
+  // proxifly: https://github.com/proxifly/free-proxy-list (3862 stars, 每5分钟更新)
+  // jetkai: https://github.com/jetkai/proxy-list (642 stars)
+  // roosterkid: https://github.com/roosterkid/openproxylist (761 stars, 有V2Ray)
+  // TheSpeedX: https://github.com/TheSpeedX/PROXY-List (备用)
   SOURCES: [
-    'https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt',
+    'https://raw.githubusercontent.com/jetkai/proxy-list/main/online-proxies/txt/proxies-http.txt',
   ],
   
   // ========== 测速配置 ==========
@@ -277,7 +281,11 @@ async function fetchProxyList(url) {
     .map(l => l.trim())
     .filter(l => l && l.includes(':'))
     .map(line => {
-      const [server, port] = line.split(':');
+      // 支持两种格式：
+      // 1. IP:PORT (如 1.2.3.4:8080)
+      // 2. http://IP:PORT
+      let clean = line.replace(/^https?:\/\//, '');
+      const [server, port] = clean.split(':');
       return { server, port: parseInt(port), type: 'http' };
     });
 }

@@ -76,6 +76,7 @@ const countryNames = {
   'AZ': '阿塞拜疆', 'GE': '格鲁吉亚', 'AM': '亚美尼亚', 'CY': '塞浦路斯',
   'LU': '卢森堡', 'MT': '马耳他', 'KY': '开曼群岛', 'PR': '波多黎各',
   'XX': '未知',
+  '66': '66代理',
 };
 
 /**
@@ -316,7 +317,7 @@ async function fetchAndTest() {
     p.latency = 1000;  // 默认延迟
     p.downloadSpeed = 1;
     p.score = 100;  // 较低分数
-    p.country = 'CN';  // 默认中国
+    p.country = '66';  // 用66区分，不过滤
     valid.push(p);
   }
   console.log(`合并66代理后共 ${valid.length} 个`);

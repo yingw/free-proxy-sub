@@ -111,6 +111,7 @@ export default {
     const country = url.searchParams.get('country');
     const limit = parseInt(url.searchParams.get('limit')) || 0;
     const key = url.searchParams.get('key');
+    const source = url.searchParams.get('source');  // 筛选来源: FP, 66, 或 all
     
     // 验证密钥
     if (CONFIG.API_KEY && key !== CONFIG.API_KEY) {
@@ -185,7 +186,11 @@ export default {
     // 获取代理
     let proxies = await getProxies();
     
-    // 筛选
+    // 筛选来源
+    if (source && source !== 'all') {
+      proxies = proxies.filter(p => p.source === source);
+    }
+    // 筛选国家
     if (country) {
       proxies = proxies.filter(p => p.country === country.toUpperCase());
     }

@@ -16,6 +16,8 @@ const CONFIG = {
   SOURCES: [
     'https://free-proxy-list.net/',
     'https://free-proxy-list.net/zh-cn/',
+    'https://free-proxy-list.net/ssl-proxy.html',
+    'https://free-proxy-list.net/zh-cn/ssl-proxy.html',
   ],
   
   // ========== 测速配置 ==========

@@ -11,10 +11,10 @@
 
 const CONFIG = {
   // ========== 数据源 ==========
-  // proxifly: 3862 stars, 每5分钟更新, 包含亚洲代理
-  // TheSpeedX: 5250 stars (备用)
+  // free-proxy-list.net: 页面抓取，每30分钟更新
+  // proxifly: 3862 stars (备用)
   SOURCES: [
-    'https://raw.githubusercontent.com/proxifly/free-proxy-list/main/proxies/protocols/http/data.txt',
+    'https://free-proxy-list.net/zh-cn/',
   ],
   
   // ========== 测速配置 ==========
@@ -275,17 +275,31 @@ async function fetchProxyList(url) {
   const response = await fetch(url, { timeout: 10000 });
   const text = await response.text();
   
-  return text.split('\n')
-    .map(l => l.trim())
-    .filter(l => l && l.includes(':'))
-    .map(line => {
-      // 支持两种格式：
-      // 1. IP:PORT (如 1.2.3.4:8080)
-      // 2. http://IP:PORT
-      let clean = line.replace(/^https?:\/\//, '');
-      const [server, port] = clean.split(':');
-      return { server, port: parseInt(port), type: 'http' };
+  // 从HTML页面提取IP:PORT
+  const ipPortRegex = /<td>([\d.]+)<\/td>\s*<td>(\d+)<\/td>/g;
+  const proxies = [];
+  let match;
+  while ((match = ipPortRegex.exec(text)) !== null) {
+    proxies.push({
+      server: match[1],
+      port: parseInt(match[2]),
+      type: 'http'
     });
+  }
+  
+  // 如果不是HTML，则尝试普通格式
+  if (proxies.length === 0) {
+    return text.split('\n')
+      .map(l => l.trim())
+      .filter(l => l && l.includes(':'))
+      .map(line => {
+        let clean = line.replace(/^https?:\/\//, '');
+        const [server, port] = clean.split(':');
+        return { server, port: parseInt(port), type: 'http' };
+      });
+  }
+  
+  return proxies;
 }
 
 /**

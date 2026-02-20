@@ -256,41 +256,70 @@ async function fetchAndTest() {
   const startTime = Date.now();
   console.log('开始抓取代理...');
   
-  // 1. 抓取
-  let rawProxies = [];
+  // 1. 抓取（分开处理）
+  let rawProxies = [];      // 需要测速的（FP）
+  let noTestProxies = [];  // 不需要测速的（66国内代理）
+  
   for (const source of CONFIG.SOURCES) {
     try {
       const list = await fetchProxyList(source);
-      rawProxies = [...rawProxies, ...list];
-      console.log(`抓取成功: ${source}, ${list.length} 个`);
+      // 66代理不测速，直接用
+      const is66 = list.length > 0 && list[0].source === '66';
+      if (is66) {
+        noTestProxies = [...noTestProxies, ...list];
+        console.log(`[66] 不测速，直接使用 ${list.length} 个`);
+      } else {
+        rawProxies = [...rawProxies, ...list];
+        console.log(`[FP] 抓取成功: ${list.length} 个`);
+      }
     } catch (e) {
       console.error(`抓取失败: ${source}`, e.message);
     }
   }
   
-  // 去重
-  rawProxies = [...new Set(rawProxies.map(p => `${p.server}:${p.port}`))]
-    .map(s => {
-      const [server, port] = s.split(':');
-      return { server, port: parseInt(port), type: 'http' };
-    });
+  // 去重（分别处理）
+  const fpSet = new Set(rawProxies.map(p => `${p.server}:${p.port}`));
+  const allAddrs = new Set([...noTestProxies.map(p => `${p.server}:${p.port}`)]);
   
-  console.log(`共 ${rawProxies.length} 个代理`);
+  rawProxies = [...fpSet].map(s => {
+    const [server, port] = s.split(':');
+    return { server, port: parseInt(port), type: 'http', source: 'FP' };
+  });
+  
+  // 66代理去重后加入
+  for (const s of allAddrs) {
+    if (!fpSet.has(s)) {
+      const [server, port] = s.split(':');
+      noTestProxies.push({ server, port: parseInt(port), type: 'http', source: '66' });
+    }
+  }
+  
+  console.log(`共 ${rawProxies.length + noTestProxies.length} 个代理 (FP:${rawProxies.length}, 66:${noTestProxies.length})`);
   
   // 2. 安全过滤
   rawProxies = rawProxies.filter(isSafeProxy);
-  console.log(`安全过滤后 ${rawProxies.length} 个`);
+  console.log(`FP安全过滤后 ${rawProxies.length} 个`);
   
-  // 3. 批量查询地区
+  // 3. 批量查询地区（仅FP）
   const ips = rawProxies.map(p => p.server);
   const countries = await fetchCountriesBatch(ips);
   
-  // 4. 测速
+  // 4. 测速（仅FP）
   const tested = await testProxies(rawProxies, countries);
   const valid = tested.filter(p => p.latency > 0);
-  const failed = tested.filter(p => p.delay <= 0);
+  const failed = tested.filter(p => p.latency <= 0);
   
-  console.log(`有效代理 ${valid.length} 个`);
+  console.log(`FP有效代理 ${valid.length} 个`);
+  
+  // 5. 合并66代理（给一个默认延迟和分数，让它们也能用）
+  for (const p of noTestProxies) {
+    p.latency = 1000;  // 默认延迟
+    p.downloadSpeed = 1;
+    p.score = 100;  // 较低分数
+    p.country = 'CN';  // 默认中国
+    valid.push(p);
+  }
+  console.log(`合并66代理后共 ${valid.length} 个`);
   
   // 4. 综合评分+排名
   const scored = valid.map(p => ({

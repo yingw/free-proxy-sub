@@ -11,9 +11,10 @@
 
 const CONFIG = {
   // ========== 数据源 ==========
-  // free-proxy-list.net: 页面抓取，每30分钟更新
+  // free-proxy-list.net: 页面抓取，每30分钟更新，支持Google筛选
   // proxifly: 3862 stars (备用)
   SOURCES: [
+    'https://free-proxy-list.net/',
     'https://free-proxy-list.net/zh-cn/',
   ],
   

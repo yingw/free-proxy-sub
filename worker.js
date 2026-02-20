@@ -136,6 +136,7 @@ export default {
         failed: result.stats.failedCount,
         successRate: result.stats.successRate,
         duration: result.stats.duration + 'ms',
+        sourceStats: result.stats.sourceStats,
         timestamp: result.stats.endTime,
       });
     }
@@ -311,7 +312,22 @@ async function fetchAndTest() {
     failedCount: failed.length,
     successRate: tested.length > 0 ? (valid.length / tested.length * 100).toFixed(1) + '%' : '0%',
     countries: {},
+    sourceStats: {},  // 来源统计
   };
+  
+  // 来源统计
+  for (const p of tested) {
+    const src = p.source || 'FP';
+    if (!stats.sourceStats[src]) {
+      stats.sourceStats[src] = { found: 0, valid: 0, failed: 0 };
+    }
+    stats.sourceStats[src].found++;
+    if (p.latency > 0) {
+      stats.sourceStats[src].valid++;
+    } else {
+      stats.sourceStats[src].failed++;
+    }
+  }
   
   // 国家统计
   for (const p of valid) {

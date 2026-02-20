@@ -513,9 +513,10 @@ function rankProxies(proxies) {
     const top = sorted.slice(0, CONFIG.MAX_PER_COUNTRY);
     
     top.forEach((p, i) => {
+      const cnName = getCountryName(country);
       result.push({
         ...p,
-        name: `${country}-${String(i + 1).padStart(2, '0')}`,
+        name: `${cnName}-${String(i + 1).padStart(2, '0')}`,
       });
     });
   }

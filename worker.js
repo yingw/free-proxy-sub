@@ -127,6 +127,18 @@ export default {
       });
     }
     
+    // 查看当前订阅的 Top 代理详情
+    if (url.pathname === '/top') {
+      const proxies = await getProxies();
+      const limit = parseInt(url.searchParams.get('limit')) || 10;
+      const topProxies = proxies.slice(0, limit);
+      return jsonResponse({
+        total: proxies.length,
+        shown: topProxies.length,
+        proxies: topProxies,
+      });
+    }
+    
     // 获取代理
     let proxies = await getProxies();
     

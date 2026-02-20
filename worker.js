@@ -264,8 +264,8 @@ async function fetchAndTest() {
   for (const source of CONFIG.SOURCES) {
     try {
       const list = await fetchProxyList(source);
-      // 66代理不测速，直接用
-      const is66 = list.length > 0 && list[0].source === '66';
+      // 判断是否是66代理（通过source type或URL判断）
+      const is66 = typeof source === 'object' && source.type === 'json66';
       if (is66) {
         noTestProxies = [...noTestProxies, ...list];
         console.log(`[66] 不测速，直接使用 ${list.length} 个`);

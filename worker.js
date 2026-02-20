@@ -275,16 +275,23 @@ async function fetchProxyList(url) {
   const response = await fetch(url, { timeout: 10000 });
   const text = await response.text();
   
-  // 从HTML页面提取IP:PORT
-  const ipPortRegex = /<td>([\d.]+)<\/td>\s*<td>(\d+)<\/td>/g;
+  // 从HTML页面提取完整信息（支持Google筛选）
+  // 格式: IP, Port, Code, Country, Anonymity, Google, Https
+  const trRegex = /<tr><td>([\d.]+)<\/td><td>(\d+)<\/td><td>([A-Z]{2})<\/td><td class='hm'>[^<]*<\/td><td>([^<]+)<\/td><td class='hm'>([^<]*)<\/td><td class='hx'>([^<]*)<\/td>/g;
   const proxies = [];
   let match;
-  while ((match = ipPortRegex.exec(text)) !== null) {
-    proxies.push({
-      server: match[1],
-      port: parseInt(match[2]),
-      type: 'http'
-    });
+  
+  while ((match = trRegex.exec(text)) !== null) {
+    const [, ip, port, code, anonymity, google, https] = match;
+    const googleOk = google.trim() === 'yes';
+    // 只保留支持Google的代理
+    if (googleOk) {
+      proxies.push({
+        server: ip,
+        port: parseInt(port),
+        type: 'http'
+      });
+    }
   }
   
   // 如果不是HTML，则尝试普通格式
@@ -299,6 +306,7 @@ async function fetchProxyList(url) {
       });
   }
   
+  console.log(`[${url}] 抓取 ${proxies.length} 个支持Google的代理`);
   return proxies;
 }
 
